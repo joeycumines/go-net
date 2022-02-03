@@ -35,6 +35,8 @@ import (
 	"time"
 
 	"golang.org/x/net/http2/hpack"
+	"golang.org/x/net/internal/backport"
+	osBackport "golang.org/x/net/internal/backport/os"
 )
 
 var (
@@ -5867,7 +5869,7 @@ func TestTransportWriteByteTimeout(t *testing.T) {
 	c := &http.Client{Transport: tr}
 
 	_, err := c.Get(st.ts.URL)
-	if !errors.Is(err, os.ErrDeadlineExceeded) {
+	if !backport.ErrorIs(err, osBackport.ErrDeadlineExceeded) {
 		t.Fatalf("Get on unresponsive connection: got %q; want ErrDeadlineExceeded", err)
 	}
 }
@@ -5888,7 +5890,7 @@ func (c *slowWriteConn) Write(b []byte) (n int, err error) {
 		if err != nil {
 			return n, err
 		}
-		return n, fmt.Errorf("slow write: %w", os.ErrDeadlineExceeded)
+		return n, fmt.Errorf("slow write: %w", osBackport.ErrDeadlineExceeded)
 	}
 	return c.Conn.Write(b)
 }

@@ -24,7 +24,6 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"net/textproto"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,6 +34,8 @@ import (
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2/hpack"
 	"golang.org/x/net/idna"
+	"golang.org/x/net/internal/backport"
+	osBackport "golang.org/x/net/internal/backport/os"
 )
 
 const (
@@ -414,7 +415,7 @@ func (sew stickyErrWriter) Write(p []byte) (n int, err error) {
 		}
 		nn, err := sew.conn.Write(p[n:])
 		n += nn
-		if n < len(p) && nn > 0 && errors.Is(err, os.ErrDeadlineExceeded) {
+		if n < len(p) && nn > 0 && backport.ErrorIs(err, osBackport.ErrDeadlineExceeded) {
 			// Keep extending the deadline so long as we're making progress.
 			continue
 		}
