@@ -1,0 +1,12 @@
+version: "1"
+rules:
+  - base: master
+    upstream: golang:master
+    assignees:
+      - joeycumines
+    reviewers:
+      - joeycumines
+    conflictReviewers:
+      - joeycumines
+label: ":arrow_heading_down: pull"
+conflictLabel: "merge-conflict"
