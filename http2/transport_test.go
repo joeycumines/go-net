@@ -5120,7 +5120,7 @@ func TestTransportExpectContinue(t *testing.T) {
 		case "/reject":
 			w.WriteHeader(403)
 		default:
-			io.Copy(io.Discard, r.Body)
+			io.Copy(ioutil.Discard, r.Body)
 		}
 	}, optOnlyServer)
 	defer st.Close()
@@ -5200,7 +5200,7 @@ func newCloseChecker(r io.ReadCloser) *closeChecker {
 }
 
 func newStaticCloseChecker(body string) *closeChecker {
-	return newCloseChecker(io.NopCloser(strings.NewReader("body")))
+	return newCloseChecker(ioutil.NopCloser(strings.NewReader("body")))
 }
 
 func (rc *closeChecker) Read(b []byte) (n int, err error) {
@@ -5372,7 +5372,7 @@ func TestTransportBlockingRequestWrite(t *testing.T) {
 				if v := r.Header.Get("Big"); v != "" && v != filler {
 					t.Errorf("request header mismatch")
 				}
-				if v, _ := io.ReadAll(r.Body); len(v) != 0 && string(v) != "body" && string(v) != filler {
+				if v, _ := ioutil.ReadAll(r.Body); len(v) != 0 && string(v) != "body" && string(v) != filler {
 					t.Errorf("request body mismatch\ngot:  %q\nwant: %q", string(v), filler)
 				}
 				if v := r.Trailer.Get("Big"); v != "" && v != filler {
@@ -5776,7 +5776,7 @@ func TestTransportContentLengthWithoutBody(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer res.Body.Close()
-			body, err := io.ReadAll(res.Body)
+			body, err := ioutil.ReadAll(res.Body)
 
 			if err != test.wantErr {
 				t.Errorf("Expected error %v, got: %v", test.wantErr, err)
@@ -5795,7 +5795,7 @@ func TestTransportCloseResponseBodyWhileRequestBodyHangs(t *testing.T) {
 	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.(http.Flusher).Flush()
-		io.Copy(io.Discard, r.Body)
+		io.Copy(ioutil.Discard, r.Body)
 	}, optOnlyServer)
 	defer st.Close()
 
@@ -5840,7 +5840,7 @@ func TestTransport300ResponseBody(t *testing.T) {
 		t.Fatal(err)
 	}
 	close(reqc)
-	got, err := io.ReadAll(res.Body)
+	got, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		t.Fatalf("error reading response body: %v", err)
 	}
