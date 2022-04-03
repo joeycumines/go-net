@@ -1489,7 +1489,7 @@ func TestTransportInvalidTrailer_EmptyFieldName(t *testing.T) {
 	})
 }
 func TestTransportInvalidTrailer_BinaryFieldValue(t *testing.T) {
-	testInvalidTrailer(t, oneHeader, headerFieldValueError("has\nnewline"), func(enc *hpack.Encoder) {
+	testInvalidTrailer(t, oneHeader, headerFieldValueError("x"), func(enc *hpack.Encoder) {
 		enc.WriteField(hpack.HeaderField{Name: "x", Value: "has\nnewline"})
 	})
 }
@@ -2453,7 +2453,7 @@ func TestTransportFailsOnInvalidHeaders(t *testing.T) {
 		},
 		3: {
 			h:       http.Header{"foo": {"foo\x01bar"}},
-			wantErr: `invalid HTTP header value "foo\x01bar" for header "foo"`,
+			wantErr: `invalid HTTP header value for header "foo"`,
 		},
 	}
 
