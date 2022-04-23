@@ -346,6 +346,10 @@ func (st *serverTester) writePreface() {
 
 func (st *serverTester) writeInitialSettings() {
 	if err := st.fr.WriteSettings(); err != nil {
+		if runtime.GOOS == "openbsd" && strings.HasSuffix(err.Error(), "write: broken pipe") {
+			st.t.Logf("Error writing initial SETTINGS frame from client to server: %v", err)
+			st.t.Skipf("Skipping test with known OpenBSD failure mode. (See https://go.dev/issue/52208.)")
+		}
 		st.t.Fatalf("Error writing initial SETTINGS frame from client to server: %v", err)
 	}
 }
@@ -2698,8 +2702,9 @@ func readBodyHandler(t *testing.T, want string) func(w http.ResponseWriter, r *h
 }
 
 // TestServerWithCurl currently fails, hence the LenientCipherSuites test. See:
-//   https://github.com/tatsuhiro-t/nghttp2/issues/140 &
-//   http://sourceforge.net/p/curl/bugs/1472/
+//
+//	https://github.com/tatsuhiro-t/nghttp2/issues/140 &
+//	http://sourceforge.net/p/curl/bugs/1472/
 func TestServerWithCurl(t *testing.T)                     { testServerWithCurl(t, false) }
 func TestServerWithCurl_LenientCipherSuites(t *testing.T) { testServerWithCurl(t, true) }
 
