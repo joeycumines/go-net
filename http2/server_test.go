@@ -3089,7 +3089,7 @@ func TestServerWritesUndeclaredTrailers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	io.Copy(io.Discard, resp.Body)
+	io.Copy(ioutil.Discard, resp.Body)
 	resp.Body.Close()
 
 	if got, want := resp.Trailer.Get(trailer), value; got != want {

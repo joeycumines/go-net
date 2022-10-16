@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -167,7 +168,7 @@ func h2cUpgrade(w http.ResponseWriter, r *http.Request) (_ net.Conn, settings []
 		return nil, nil, errors.New("h2c: connection does not support Hijack")
 	}
 
-	body, _ := io.ReadAll(r.Body)
+	body, _ := ioutil.ReadAll(r.Body)
 	r.Body = io.NopCloser(bytes.NewBuffer(body))
 
 	conn, rw, err := hijacker.Hijack()

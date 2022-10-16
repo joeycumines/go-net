@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -85,7 +86,7 @@ func TestLimitListenerOverload(t *testing.T) {
 			// server. We can distinguish the two based on whether the listener writes
 			// anything to the connection — a connection that was queued but not
 			// accepted will be closed without transferring any data.
-			if b, err := io.ReadAll(c); len(b) < len(msg) {
+			if b, err := ioutil.ReadAll(c); len(b) < len(msg) {
 				t.Log(err)
 				return
 			}
