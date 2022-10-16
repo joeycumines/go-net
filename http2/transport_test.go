@@ -3414,7 +3414,7 @@ func TestClientConnPing(t *testing.T) {
 // connection.
 func TestTransportCancelDataResponseRace(t *testing.T) {
 	cancel := make(chan struct{})
-	clientGotError := make(chan bool, 1)
+	clientGotResponse := make(chan bool, 1)
 
 	const msg = "Hello."
 	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
@@ -3427,8 +3427,8 @@ func TestTransportCancelDataResponseRace(t *testing.T) {
 			io.WriteString(w, "Some data.")
 			w.(http.Flusher).Flush()
 			if i == 2 {
+				<-clientGotResponse
 				close(cancel)
-				<-clientGotError
 			}
 			time.Sleep(10 * time.Millisecond)
 		}
@@ -3442,13 +3442,13 @@ func TestTransportCancelDataResponseRace(t *testing.T) {
 	req, _ := http.NewRequest("GET", st.ts.URL, nil)
 	req.Cancel = cancel
 	res, err := c.Do(req)
+	clientGotResponse <- true
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err = io.Copy(ioutil.Discard, res.Body); err == nil {
 		t.Fatal("unexpected success")
 	}
-	clientGotError <- true
 
 	res, err = c.Get(st.ts.URL + "/hello")
 	if err != nil {
@@ -5923,4 +5923,130 @@ func TestTransportSlowWrites(t *testing.T) {
 		t.Fatal(err)
 	}
 	resp.Body.Close()
+}
+
+func TestTransportClosesConnAfterGoAwayNoStreams(t *testing.T) {
+	testTransportClosesConnAfterGoAway(t, 0)
+}
+func TestTransportClosesConnAfterGoAwayLastStream(t *testing.T) {
+	testTransportClosesConnAfterGoAway(t, 1)
+}
+
+type closeOnceConn struct {
+	net.Conn
+	closed uint32
+}
+
+var errClosed = errors.New("Close of closed connection")
+
+func (c *closeOnceConn) Close() error {
+	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
+		return c.Conn.Close()
+	}
+	return errClosed
+}
+
+// testTransportClosesConnAfterGoAway verifies that the transport
+// closes a connection after reading a GOAWAY from it.
+//
+// lastStream is the last stream ID in the GOAWAY frame.
+// When 0, the transport (unsuccessfully) retries the request (stream 1);
+// when 1, the transport reads the response after receiving the GOAWAY.
+func testTransportClosesConnAfterGoAway(t *testing.T, lastStream uint32) {
+	ct := newClientTester(t)
+	ct.cc = &closeOnceConn{Conn: ct.cc}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	ct.client = func() error {
+		defer wg.Done()
+		req, _ := http.NewRequest("GET", "https://dummy.tld/", nil)
+		res, err := ct.tr.RoundTrip(req)
+		if err == nil {
+			res.Body.Close()
+		}
+		if gotErr, wantErr := err != nil, lastStream == 0; gotErr != wantErr {
+			t.Errorf("RoundTrip got error %v (want error: %v)", err, wantErr)
+		}
+		if err = ct.cc.Close(); err != errClosed {
+			return fmt.Errorf("ct.cc.Close() = %v, want errClosed", err)
+		}
+		return nil
+	}
+
+	ct.server = func() error {
+		defer wg.Wait()
+		ct.greet()
+		hf, err := ct.firstHeaders()
+		if err != nil {
+			return fmt.Errorf("server failed reading HEADERS: %v", err)
+		}
+		if err := ct.fr.WriteGoAway(lastStream, ErrCodeNo, nil); err != nil {
+			return fmt.Errorf("server failed writing GOAWAY: %v", err)
+		}
+		if lastStream > 0 {
+			// Send a valid response to first request.
+			var buf bytes.Buffer
+			enc := hpack.NewEncoder(&buf)
+			enc.WriteField(hpack.HeaderField{Name: ":status", Value: "200"})
+			ct.fr.WriteHeaders(HeadersFrameParam{
+				StreamID:      hf.StreamID,
+				EndHeaders:    true,
+				EndStream:     true,
+				BlockFragment: buf.Bytes(),
+			})
+		}
+		return nil
+	}
+
+	ct.run()
+}
+
+type slowCloser struct {
+	closing chan struct{}
+	closed  chan struct{}
+}
+
+func (r *slowCloser) Read([]byte) (int, error) {
+	return 0, io.EOF
+}
+
+func (r *slowCloser) Close() error {
+	close(r.closing)
+	<-r.closed
+	return nil
+}
+
+func TestTransportSlowClose(t *testing.T) {
+	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
+	}, optOnlyServer)
+	defer st.Close()
+
+	client := st.ts.Client()
+	body := &slowCloser{
+		closing: make(chan struct{}),
+		closed:  make(chan struct{}),
+	}
+
+	reqc := make(chan struct{})
+	go func() {
+		defer close(reqc)
+		res, err := client.Post(st.ts.URL, "text/plain", body)
+		if err != nil {
+			t.Error(err)
+		}
+		res.Body.Close()
+	}()
+	defer func() {
+		close(body.closed)
+		<-reqc // wait for POST request to finish
+	}()
+
+	<-body.closing // wait for POST request to call body.Close
+	// This GET request should not be blocked by the in-progress POST.
+	res, err := client.Get(st.ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
 }
