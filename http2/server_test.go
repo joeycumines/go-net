@@ -4398,7 +4398,7 @@ func TestProtocolErrorAfterGoAway(t *testing.T) {
 	st := newServerTester(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.(http.Flusher).Flush()
-		io.Copy(io.Discard, r.Body)
+		io.Copy(ioutil.Discard, r.Body)
 	})
 	defer st.Close()
 

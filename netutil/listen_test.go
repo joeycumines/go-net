@@ -194,7 +194,7 @@ func TestLimitListenerSaturation(t *testing.T) {
 				atomic.AddInt32(&dialed, 1)
 				defer c.Close()
 
-				if b, err := io.ReadAll(c); len(b) < len(msg) {
+				if b, err := ioutil.ReadAll(c); len(b) < len(msg) {
 					t.Log(err)
 					return
 				}
